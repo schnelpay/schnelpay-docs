@@ -13,7 +13,7 @@
 | 4 | Add PIN rate limiting — 3 attempts → 15 min lockout | Backend | Prevents brute force on 6-digit PIN |
 | 5 | Add audit fields to withdrawal logging | Backend | IP address, timestamp, device info |
 | 6 | Add withdrawal delay — configurable WITHDRAWAL_DELAY_MINUTES | Backend + Admin | Default 15 min, add as feature flag |
-| 7 | npm audit fix | Backend | 15 vulnerabilities |
+| 7 | Upgrade ethers v5 → v6 | Backend | Fixes elliptic vulnerability — breaking change, needs token service rewrite |
 
 ---
 
