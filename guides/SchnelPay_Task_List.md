@@ -90,6 +90,14 @@
 
 ---
 
+## 🔁 Recurring
+
+| Task | Next Due | Notes |
+|------|----------|-------|
+| Regenerate GitHub PAT "SchnelPay Development" | June 14, 2026 | Set 90 days on next renewal |
+
+---
+
 ## ✅ Completed
 
 | # | Task | Completed | Notes |
