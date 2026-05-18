@@ -17,6 +17,23 @@
 
 ---
 
+## 🤝 Partner Applications — In Progress
+
+| # | Partner | Region | Status | Notes |
+|---|---------|--------|--------|-------|
+| P1 | Transak | Global | ✅ KYB Approved | Webhook whitelist pending |
+| P2 | Ramp Network | EU/UK/Canada | 📤 Email drafted | Apply at ramp.network/partners |
+| P3 | Coinbase Pay SDK | US/Canada | 📤 Email drafted | Apply at coinbase.com/cloud/products/pay-sdk |
+| P4 | Kraken Ramp | Global | 🔜 Next week | 400+ tokens, 30+ markets |
+| P5 | Onramper | Global aggregator | 🔜 After Transak stable | Single API covers 30+ ramps |
+| P6 | Kado | Stablecoin/off-ramp | 🔜 Phase 2 | 1.5% flat fee, best for off-ramp |
+| P7 | MoonPay | Global | 🔜 After traction/MSB | Previously rejected — reapply later |
+| P8 | Ripio | Latin America | 🔜 Phase 2 | Mercado Pago, Argentina focus |
+| P9 | Banxa | Canada/Australia | 🔜 Phase 2 | FINTRAC registered |
+| P10 | Alchemy Pay | Asia | 🔜 Phase 2 | Regional wallets, Asia-Pacific |
+
+---
+
 ## 🟡 This Week — Content & Business
 
 | # | Task | Date | Notes |
