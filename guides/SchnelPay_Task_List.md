@@ -22,8 +22,8 @@
 | # | Partner | Region | Status | Notes |
 |---|---------|--------|--------|-------|
 | P1 | Transak | Global | ✅ KYB Approved | Webhook whitelist pending |
-| P2 | Ramp Network | EU/UK/Canada | 📤 Email drafted | Apply at ramp.network/partners |
-| P3 | Coinbase Pay SDK | US/Canada | 📤 Email drafted | Apply at coinbase.com/cloud/products/pay-sdk |
+| P2 | Ramp Network | EU/UK/Canada | ✅ Applied May 18 | Awaiting review 3-5 days |
+| P3 | Coinbase Onramp | US/Canada | ✅ Applied May 18 | Awaiting review 3-5 days |
 | P4 | Kraken Ramp | Global | 🔜 Next week | 400+ tokens, 30+ markets |
 | P5 | Onramper | Global aggregator | 🔜 After Transak stable | Single API covers 30+ ramps |
 | P6 | Kado | Stablecoin/off-ramp | 🔜 Phase 2 | 1.5% flat fee, best for off-ramp |
