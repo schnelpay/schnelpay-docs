@@ -1,0 +1,6 @@
+"My name is Randeep Singh, founder of SchnelPay.
+Every day, $2 trillion moves across borders — slowly, expensively, and on infrastructure that was designed before the internet existed. Wire transfers take 5 days and cost $50. And the cryptography protecting every Bitcoin wallet? A quantum computer could break it in hours.
+SchnelPay is a quantum-safe crypto payment platform. We're the only payment network built with NIST FIPS 204 post-quantum cryptography from day one — before the threat is real, not after.
+In 6 weeks, solo, I built and launched a live platform — schnelpay.com — with real users, MoonPay and Transak integrated, and support for Bitcoin, Ethereum, Solana, USDC and USDT.
+Non-custodial is free forever. Custodial is 0.5% per transaction. The market is every business that accepts payments internationally — and can't afford to rebuild their security stack in 10 years when quantum arrives.
+We're raising $500K on a SAFE. I'm applying to YC because I want to build this with the best."*
