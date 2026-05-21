@@ -21,7 +21,7 @@
 
 | # | Partner | Region | Status | Notes |
 |---|---------|--------|--------|-------|
-| P1 | Transak | Global | ✅ KYB Approved | Webhook whitelist pending |
+| P1 | Transak | Global | ✅ Fully Live | Webhook whitelisted May 21, 2026 |
 | P2 | Ramp Network | EU/UK/Canada | ✅ Applied May 18 | Awaiting review 3-5 days |
 | P3 | Coinbase Onramp | US/Canada | ✅ Applied May 18 | Awaiting review 3-5 days |
 | P4 | Kraken Ramp | Global | 🔜 Next week | 400+ tokens, 30+ markets |
