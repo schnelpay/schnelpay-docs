@@ -1,0 +1,47 @@
+The document evaluates SchnelPay's V2 financial architecture, upgrading its assessment from a "good startup design" to "ready for implementation review" due to critical updates that mitigate major fintech risks (p. 1).
+------------------------------
+## Executive Summary of Scores
+The architecture shows significant improvement across all security and compliance metrics (p. 1):## Core Strengths
+The combination of Approval Snapshots, Pre-Broadcast Verification, and a Reconciling State successfully eliminates two primary financial failure modes: Time-of-Check/Time-of-Use (TOCTOU) exploits and unknown partner outcomes (p. 1).
+------------------------------
+## Technical Security Issues Identified
+While V2 is heavily improved, the architect highlights three critical security gaps in the current setup:
+
+* Shared Secret Risk: The APPROVAL_SECRET for HMAC generation is stored insecurely within standard application environment variables (p. 5).
+* Soft Event Ledger: The event ledger relies purely on application convention rather than programmatic enforcement to remain append-only (p. 6).
+* Stale Approvals: There is no safety mechanism protecting the system if a transaction is approved but delayed for hours or days before broadcasting, creating window vulnerabilities for user status or sanction updates (p. 7).
+
+------------------------------
+## Architecture Decisions & Recommendations## 1. Data Modeling & Storage
+
+* Decision: Use a separate immutable table (withdrawal_approval_snapshots) instead of a JSONB column (pp. 1-2).
+* Impact: Prevents an attacker who modifies custodial_transactions from simultaneously manipulating the snapshot, preserving forensic evidence and isolation of duties (p. 2).
+
+## 2. Failure Domain Isolation
+
+* Decision: Halt the background worker process rather than crashing the Express web application if a bad configuration is discovered (pp. 2-3).
+* Impact: Disables automated withdrawal processing safely while preserving critical user access to support, logging, and account cancellation (p. 3).
+
+## 3. State Machine & Tamper Response
+
+* Decision: Introduce a dedicated security_hold or manual_review state (p. 3).
+* Impact: Prevents tampered transactions from routing directly to a generic failed state, ensuring security incidents are visibly distinguished from standard operational glitches (p. 4).
+
+## 4. Integration Roadmap
+
+* Outbox Pattern: Delay building the transaction outbox until partner APIs, custody constraints, and precise idempotency behaviors are defined to avoid architectural guesswork (pp. 4-5).
+* Ledger Immutability: Enforce INSERT-only application logic immediately, followed by database-level triggers (BEFORE UPDATE/DELETE RAISE EXCEPTION) prior to launch (pp. 6-7).
+* Secret Evolution: Transition secrets from basic environmental variables (Phase A) to Cloud KMS solutions like AWS KMS or Google Cloud KMS (Phase B) (p. 5).
+
+------------------------------
+## Final V2.1 Checklist for Implementation Review
+To progress to final security testing, implement these 5 concrete additions (p. 8):
+
+   1. Deploy separate withdrawal_approval_snapshots table with dedicated signatures (pp. 2, 8).
+   2. Add a security_hold state for detected tampering events (pp. 4, 8).
+   3. Enforce a maximum approval age limit (e.g., WITHDRAWAL_MAX_DELAY_AGE_HOURS = 24), routing expired approvals to manual review (pp. 7-8).
+   4. Apply strict database-level trigger restrictions to prevent any updates or deletions on the event ledger (pp. 6, 8).
+   5. Require partner status lookups via client reference IDs instead of just transaction hashes to ensure reconciliation before blockchain execution (pp. 7-8).
+
+Would you like help writing the SQL database triggers to enforce the immutable ledger, or drafting the KMS roadmap specification for Phase B?
+
