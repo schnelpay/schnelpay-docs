@@ -1,0 +1,2 @@
+The Phase 3.2 design effectively mitigates TOCTOU risks for custodial withdrawals by utilizing immutable, HMAC-signed snapshots and mandatory delays. While the current design is robust, recommendations include expanding the signed field set to include network fees and destination tags, and strengthening DB immutability against superuser access. The system is configured for pre-launch, with full security audits and proper key management required before enabling production access. 
+

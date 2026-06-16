@@ -1,0 +1,376 @@
+I reviewed the updated version and my opinion is that the overall architecture is heading in the right direction, but if SchnelPay intends to position itself as a serious future custodial platform—even under a licensed BaaS/CaaS partner—I’d make a few structural changes now rather than retrofitting them later.
+
+What I Would Keep As-Is
+
+Keep broadcast_after
+
+This is the correct design.
+
+Benefits:
+
+* Audit-friendly-
+* Immutable delay history
+* Independent of future config changes
+* Easier reporting and investigations
+
+I would also index it:
+
+CREATE INDEX idx_withdrawals_broadcast_after
+ON custodial_transactions(status, broadcast_after);
+
+⸻
+
+Keep Conditional UPDATE + SKIP LOCKED
+
+Your proposed ownership model is sound.
+
+UPDATE custodial_transactions
+SET status='broadcasting'
+WHERE id=$1
+AND status='processing'
+AND broadcast_after <= NOW()
+
+This is a standard financial-system pattern.
+
+No issue there.
+
+⸻
+
+What I Would Change
+
+1. Add Withdrawal Snapshot (High Priority)
+
+This is missing from the document.
+
+At approval:
+
+{
+  "amount": "1000.00",
+  "asset": "USDC",
+  "destination_address": "0x123...",
+  "approved_by": "admin-id",
+  "approved_at": "timestamp"
+}
+
+Store it permanently.
+
+Before broadcast:
+
+Compare current values
+to approved values
+
+If anything differs:
+
+STOP
+FLAG
+REVIEW
+
+This protects against:
+
+* address substitution
+* amount manipulation
+* programming bugs
+* insider threats
+
+I would classify this as mandatory before custodial launch.
+
+⸻
+
+2. Add Reconciliation State
+
+Current:
+
+processing
+broadcasting
+completed
+failed
+
+Recommended:
+
+processing
+broadcasting
+reconciling
+completed
+failed
+cancelled
+
+Reason:
+
+You cannot always know whether a partner received a withdrawal request.
+
+Example:
+
+Partner receives request
+Network timeout
+Your service never receives response
+
+Did it succeed?
+
+Did it fail?
+
+You don’t know.
+
+That is not “failed.”
+
+That is:
+
+reconciling
+
+⸻
+
+3. Require Partner Idempotency
+
+I would update the SchnelPay platform requirements.
+
+Future custody partners must support:
+
+Idempotency-Key
+
+or
+
+Client Request ID
+
+on withdrawal creation.
+
+Without that, recovery becomes dangerous.
+
+I would actually add this to your partner-selection checklist.
+
+⸻
+
+4. Add Immutable Event Ledger
+
+Instead of relying solely on status changes:
+
+withdrawal_events
+
+Example:
+
+Event
+
+created
+
+approved
+
+delay_started
+
+cancelled
+
+claimed
+
+broadcast_started
+
+broadcast_completed
+
+completed
+
+Benefits:
+
+* Security investigations
+* Compliance
+* Auditing
+* Debugging
+
+This is one of those features that seems unnecessary until the first incident.
+
+Then it becomes invaluable.
+
+⸻
+
+Where I Disagree With The Current Document
+
+Fail-Slow vs Fail-Stopped
+
+Current proposal:
+
+Bad config
+→ use 60 minute default
+
+I would not do this.
+
+I recommend:
+
+Bad config
+→ no broadcasts
+→ alert admins
+
+Why?
+
+Because:
+
+Funds delayed
+
+is recoverable.
+
+Funds sent incorrectly
+
+may not be.
+
+For a financial platform, safety should beat availability.
+
+⸻
+
+User Cancellation
+
+I would allow it.
+
+Requirements:
+
+status='processing'
+AND broadcast_after > NOW()
+
+No meaningful abuse risk.
+
+Benefits:
+
+* Fraud mitigation
+* User confidence
+* Support reduction
+
+Your race-condition handling is already sufficient.
+
+⸻
+
+Threats Missing From Section 5
+
+I’d add:
+
+Address Substitution Attack
+
+Approved:
+
+Address A
+
+Broadcast:
+
+Address B
+
+Mitigation:
+
+Approval snapshot.
+
+⸻
+
+Amount Modification Attack
+
+Approved:
+
+100 USDC
+
+Broadcast:
+
+10000 USDC
+
+Mitigation:
+
+Approval snapshot.
+
+⸻
+
+Insider Abuse
+
+Current threat model focuses heavily on compromised sessions.
+
+Add:
+
+Malicious administrator
+
+Controls:
+
+* PIN
+* TOTP
+* Delay
+* Audit ledger
+* Snapshot verification
+
+⸻
+
+Replay Attack At Partner Layer
+
+Partner accidentally processes:
+
+same withdrawal twice
+
+Mitigation:
+
+Mandatory partner-side idempotency.
+
+⸻
+
+Worker Architecture Recommendation
+
+For SchnelPay’s current size:
+
+Today
+
+Option A
+
+Node Backend
++
+In-Process Worker
++
+Database Locking
+
+is perfectly reasonable.
+
+I would not add a separate Railway worker yet.
+
+⸻
+
+Later
+
+When you have:
+
+* multiple backend instances
+* higher transaction volume
+* actual custody partner
+
+move to:
+
+API Service
+Withdrawal Worker
+Reconciliation Worker
+
+Three separate responsibilities.
+
+⸻
+
+If This Were My Design Document
+
+I would update the platform profile to explicitly include:
+
+Security Controls
+
+* Withdrawal delay window
+* PIN-gated approval
+* TOTP approval (future)
+* Immutable withdrawal approval snapshot
+* Pre-broadcast verification
+* Partner idempotency keys
+* Reconciliation workflow
+* User cancellation during delay window
+* Immutable withdrawal event ledger
+* Fail-stopped broadcast behavior on invalid configuration
+
+Operational Controls
+
+* Broadcast worker
+* Reconciliation worker
+* Recovery procedures
+* Audit reporting
+
+Future Custody Partner Requirements
+
+* Idempotent withdrawal APIs
+* Withdrawal status lookup APIs
+* Request correlation IDs
+* Audit logs
+* Webhook retry support
+
+Of all my recommendations, the three I would prioritize before any custodial launch are:
+
+1. Immutable approval snapshot
+2. Reconciliation state/workflow
+3. Partner idempotency support
+
+Those three controls eliminate the majority of catastrophic withdrawal-failure scenarios that typically affect early fintech and crypto platforms.

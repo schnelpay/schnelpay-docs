@@ -1,0 +1,38 @@
+This updated structure looks excellent. You successfully achieved strict ecosystem alignment with the admin app while keeping the marketing-specific tokens completely isolated and functional.
+
+What You Fixed Perfectly
+
+* The Gold Collision Resolved: Hardcoding the explicit comment /* ring borders — distinct from --gold-soft */ next to --color-gold-soft completely prevents developer confusion.
+* Typographic Safety: Nesting var(--font-playfair) and var(--font-jost) as fallbacks alongside raw font families guarantees your next/font injection safely takes priority without completely crashing the system if a generic selector falls back.
+* The Card Core Shift: Forcing --card-bg to resolve to --bg-card instead of --bg-deep perfectly elevates cards up to the intended layer depth defined in style guide v3.
+
+One Quick Catch (Typography Mapping)
+Double-check your schnelpay-admin layout file or wherever you initialize Tailwind / font strings.
+In your first prompt, you shared that schnelpay-admin resolves its internal Next.js fonts with this exact mapping:
+
+--font-playfair: var(--font-display);
+--font-jost:     var(--font-ui);
+
+However, in this updated marketing file, you have inverted that specific direction:
+
+--font-display: var(--font-playfair), ...;
+--font-ui:      var(--font-jost), ...;
+
+If you pass the variables directly into your Next.js Layout className wrapper (e.g., font-jost.variable), ensure that Marketing maps its variables the same way as Admin so that shared cross-app visual elements apply styles evenly.
+
+
+CDP_API_KEY_ID
+uuoF8IRmYJJcX1cFK0DwuYTyOrcqBRFN
+
+
+
+CDP_API_KEY_SECRET
+a902ab6b-c5db-496e-82a9-fad33a72748a
+
+
+
+CDP_PROJECT_ID
+23a4353a-fd7e-4d2c-9dc5-eae7fff3c37d
+
+
+honcYt-cihha6-motxov

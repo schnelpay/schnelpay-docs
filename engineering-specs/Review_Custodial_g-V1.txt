@@ -1,0 +1,100 @@
+## Overall Architecture Assessment
+The design document for Phase 3.2 is remarkably mature, realistic, and tailored well for a solo-founder setup (pp. 1, 5). You are prioritizing the correct structural concerns—immutability, predictability, and failure isolation—before you ever tie yourself to a specific custody provider's API quirks (pp. 3, 6).
+Below is the targeted architectural review addressing your specific concerns, including a refined, production-grade path that fits your current "solo-founder, low-volume, single-instance" profile (p. 5) while ensuring you don't build technical debt that causes financial loss.
+------------------------------
+## 1. The Dual-Write & Idempotency Problem (§4.4)
+
+Your Concern: What happens if the partner broadcast succeeds, but your database write fails? (p. 5)
+
+Your current plan (SELECT ... FOR UPDATE SKIP LOCKED + optimistic UPDATE) perfectly handles inbound concurrency (preventing two internal loops from touching the same row) (p. 5). However, it does not solve the external dual-write problem (p. 5).
+## The Better Path: The Idempotent Outbox Ledger
+Do not rely on a single state transition field (processing → broadcasting → completed) to track network boundaries (pp. 2, 5). If the partner API responds with a 200 OK but your database drops the connection before saving completed, your worker will retry later, see processing or broadcasting, and send it again (p. 5).
+
+[custodial_transactions] ────(Trigger)────> [transaction_outbox]
+ (The master balance ledger)                 (The immutable network intent)
+                                                           │
+                                                   (Deterministic ID)
+                                                           ▼
+                                                    Regulated Partner API
+
+
+   1. Create an Outbox Table: Introduce a transaction_outbox table.
+   2. Deterministic Idempotency Keys: The Idempotency Key sent to your BaaS partner must never be generated randomly at runtime (e.g., uuidv4()). It must be a deterministic hash of the master record:
+   $$\text{Idempotency Key} = \text{SHA256}(\text{transaction\_id} + \text{withdrawal\_address} + \text{amount})$$ 
+   3. The Reconciliation Loop: If a database crash occurs mid-broadcast, the recovering worker must first poll the partner API using the deterministic key to ask, "Do you know about this transaction?" before attempting a re-broadcast (p. 5).
+
+------------------------------
+## 2. Fail-Closed Posture (§4.2)
+
+Your Concern: Should a missing configuration use a long default or halt all broadcasts? (p. 5)
+
+
+* The Verdict: Fail-Stopped (Halt) is the only acceptable security posture for custodial crypto movements (p. 5).
+* The Reason: A "long default" (e.g., 60 minutes) still allows money to leave the platform automatically if a configuration failure goes unnoticed over a weekend (p. 5). If configuration data cannot be parsed cleanly, your code must throw an unhandled exception, crash the worker loop, and trigger an alert (p. 5).
+
+## Refined Logic
+
+function resolveDelayMinutes(): number {
+  const raw = process.env.WITHDRAWAL_DELAY_MINUTES;
+  if (!raw || isNaN(Number(raw))) {
+    logger.emergency("CRITICAL: Withdrawal delay config missing or corrupt. Halting worker loop.");
+    throw new ConfigurationError("System unsafe for processing withdrawals.");
+  }
+  return Math.max(10, Math.min(1440, Number(raw))); // Enforce strict invariants
+}
+
+------------------------------
+## 3. Worker Architecture Selection (§4.3)
+
+Your Concern: Is Option A (In-process interval) defensible for launch? (pp. 4-5)
+
+
+* The Verdict: Option A is highly defensible, provided you implement one crucial modification to isolate the event loop (pp. 4-5).
+* The Caveat: Node.js is single-threaded. If a partner API call hangs or experiences heavy network latency, a basic in-process setInterval can block or delay your main web thread, degrading UX for active web users (p. 4).
+
+## The Better Path: Isolated In-Process Loop
+Instead of importing your worker logic directly into your server entry point, use Node’s native child_process.fork() or worker_threads inside your main app instance.
+
+* This allows you to deploy a single container instance to Railway (keeping infrastructure overhead at zero) (pp. 4-5).
+* It guarantees that your API handlers and your money-processing database loops run on completely separate operating system threads.
+
+------------------------------
+## 4. Cancellation Window & Threat Model Gaps (§4.5 & §5)
+
+Your Concern: Should users self-cancel? What threats are being missed? (pp. 5-6)
+
+## User Self-Cancellation
+Yes, explicitly allow this. (p. 6) It turns your entire user base into distributed intrusion detection sensors. If a user receives an automated email stating "Your withdrawal of 2 BTC has been approved and will process in 30 minutes," a self-cancel button allows them to mitigate a compromised account instantly without waiting for a support ticket.
+
+* The Vector to Block: To prevent a malicious user from "griefing" your database via rapid request spamming, rate-limit the cancellation endpoint strictly by user ID using an in-memory store like Redis or a fast DB counter.
+
+## The Missing Threat: Data Tampering (Time-of-Check to Time-of-Use)
+Your threat model misses a classic database-level attack (p. 6): An attacker compromises your database via SQL injection or a rogue employee modifies a row directly in the database after an admin has safely approved it (pp. 3, 6). They change the withdrawal_address to their own while the transaction sits silently in its processing delay window (pp. 2-3).
+
+* The Fix: When the withdrawal is approved, generate a cryptographic signature of the critical details:
+$$\text{Approval Signature} = \text{HMAC\_SHA256}(\text{tx\_id} + \text{amount} + \text{destination\_address}, \text{ENV\_SECRET})$$ 
+* Store this signature in a dedicated column. When the broadcast worker picks up the row 30 minutes later, it must recalculate the HMAC (p. 4). If the database row was tampered with during the delay window, the signature validation fails, and the transaction automatically locks down (p. 6).
+
+------------------------------
+## 5. Architectural Approach Validation (§4.6)
+
+Your Concern: Is building the control flow around a mock stub sound? (p. 6)
+
+This is entirely sound and highly recommended. (p. 6) In crypto platforms, partner APIs change frequently due to compliance adjustments, technical upgrades, or business migrations (p. 1).
+By building your state machine, delay engines, tracking structures, and signature verifications around a clean, decoupled interface (Stub) today, you ensure your core application code remains pristine (pp. 2, 6). When your CaaS partner is finalized, your integration task is reduced to writing a single standalone adapter class that fulfills that interface (pp. 1-2).
+------------------------------
+## Summary of Updated Implementation Path
+To adjust your development profile smoothly, follow this updated build sequence:
+
+1. Add Schema Columns ──> 2. Implement App-Level ──> 3. Fork Worker Thread ──> 4. Bind Deterministic
+   (broadcast_after,         HMAC Tamper Guard          (Option A variant)         Idempotency Key
+    approval_signature)                                                            & API Stubs
+
+------------------------------
+If you would like to refine this implementation plan further, please let me know:
+
+* What database engine (e.g., PostgreSQL) you are running so we can map out the exact lock syntax.
+* Your current backend framework (e.g., Express, NestJS) to structure the isolated worker loop safely.
+* Whether you want to draft the precise database schema changes for the tamper-evident signature column.
+
+

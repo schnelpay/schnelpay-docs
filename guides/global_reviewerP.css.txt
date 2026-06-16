@@ -1,0 +1,154 @@
+Responsive design:
+
+
+1. Make Card Padding Responsive
+
+Current:
+
+--card-padding-y: var(--space-9);
+--card-padding-x: var(--space-10);
+
+This equals:
+
+36px 40px
+
+which is too large on mobile.
+
+Replace with:
+
+--card-padding-y: clamp(20px, 4vw, 36px);
+--card-padding-x: clamp(16px, 4vw, 40px);
+
+⸻
+
+2. Add Container Tokens
+
+I don’t see any container system.
+
+Add:
+
+--container-sm: 640px;
+--container-md: 768px;
+--container-lg: 1024px;
+--container-xl: 1280px;
+--container-2xl: 1440px;
+
+Then:
+
+.container {
+  width: 100%;
+  max-width: var(--container-xl);
+  margin-inline: auto;
+  padding-inline: clamp(16px, 4vw, 32px);
+}
+
+This becomes your standard layout wrapper.
+
+⸻
+
+3. Add Breakpoint Documentation
+
+Even if using Tailwind:
+
+--bp-sm: 640px;
+--bp-md: 768px;
+--bp-lg: 1024px;
+--bp-xl: 1280px;
+--bp-2xl: 1536px;
+
+This keeps Admin and Marketing synchronized.
+
+⸻
+
+4. Make Radius Scale Responsive
+
+Current:
+
+--radius-lg: 20px;
+
+Better:
+
+--radius-lg: clamp(12px, 1.5vw, 20px);
+
+Large radii can look exaggerated on phones.
+
+⸻
+
+5. Add Fluid Typography Tokens
+
+You’re currently defining font families only.
+
+Add:
+
+--text-xs: clamp(.75rem,.7rem + .2vw,.875rem);
+--text-sm: clamp(.875rem,.8rem + .2vw,1rem);
+--text-base: clamp(1rem,.95rem + .3vw,1.125rem);
+--text-lg: clamp(1.125rem,1rem + .5vw,1.5rem);
+--text-xl: clamp(1.5rem,1.2rem + 1vw,2rem);
+--text-2xl: clamp(2rem,1.5rem + 2vw,3rem);
+
+Especially useful for blog content and landing pages.
+
+⸻
+
+6. Add Accessibility Motion Controls
+
+Marketing sites often have animations.
+
+Add:
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+⸻
+
+7. Add Global Overflow Protection
+
+I recommend:
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+img,
+video,
+svg {
+  max-width: 100%;
+  height: auto;
+}
+body {
+  overflow-x: hidden;
+}
+
+This prevents many mobile layout bugs.
+
+⸻
+
+One Architectural Change I’d Make
+
+Currently:
+
+--card-bg: var(--bg-card);
+
+Admin and Marketing are now using the same card background.
+
+For future flexibility:
+
+--card-bg-default: var(--bg-card);
+--card-bg-elevated: var(--bg-deep);
+--card-bg: var(--card-bg-default);
+
+This lets you introduce special card variants later without refactoring everything.
+
+The token architecture is now consistent with the Admin application and looks maintainable for SchnelPay’s long-term growth.
+
+The biggest remaining issue is not the tokens—it’s verifying that the actual components (navbar, hero sections, blog cards, pricing tables, API docs tables, footer, and mobile menu) consume these tokens responsively. That’s where most real-world responsive bugs usually live.

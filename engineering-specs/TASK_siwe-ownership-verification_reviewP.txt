@@ -1,0 +1,435 @@
+I reviewed the entire specification. Overall, this is a strong design and substantially better than most SIWE implementations I audit. The author clearly understands Coinbase’s review concerns and correctly identified ERC-1271/6492 and replay protection as the highest-risk areas.
+
+That said, there are several places I would harden before implementation.
+
+Executive Summary
+
+Grade: A- (Production-worthy with several important hardening items)
+
+Major strengths:
+
+* Server-issued nonce
+* Nonce bound to authenticated user
+* Single-use via GETDEL
+* Address recovered from signed payload
+* Domain validation
+* Smart-wallet awareness (ERC-1271/6492)
+* Fail-closed design
+* No address trust from frontend
+
+Primary concerns:
+
+1. Chain ID validation is incomplete.
+2. Nonce race conditions need explicit handling.
+3. RPC trust assumptions need tightening.
+4. SIWE message age validation is underspecified.
+5. ERC-6492 dependency/version verification should be pinned and tested.
+6. Session fixation/cross-account edge cases should be addressed.
+
+⸻
+
+1. Smart Wallet Verification Review (Highest Risk Area)
+
+Good
+
+This is the correct architectural direction:
+
+verifySiweMessage({
+  message,
+  signature
+})
+
+instead of:
+
+recoverAddress(...)
+
+or
+
+verifyMessage(...)
+
+The spec correctly identifies that Coinbase Smart Wallets are:
+
+* ERC-1271
+* potentially ERC-6492
+* often counterfactual
+
+A surprising number of implementations fail Coinbase review because they only test MetaMask EOAs.
+
+⸻
+
+Missing Chain Validation
+
+Current spec:
+
+parseSiweMessage()
+extract chainId
+
+but nowhere do I see:
+
+ALLOWED_CHAIN_IDS.includes(chainId)
+
+Without this:
+
+* user could sign on unsupported chain
+* backend may attempt verification against arbitrary RPC selection
+* future logic may accidentally trust chains not intended
+
+I would add:
+
+const ALLOWED_CHAINS = [1, 8453]
+if (!ALLOWED_CHAINS.includes(chainId)) {
+  reject()
+}
+
+before verification.
+
+⸻
+
+Verify RPC Selection Cannot Be User-Controlled
+
+Current wording:
+
+publicClientFor(chainId)
+
+Good idea.
+
+But ensure:
+
+const client = CLIENTS[chainId]
+
+not:
+
+createPublicClient({
+ transport: http(userProvidedRpc)
+})
+
+Never allow the message to influence the RPC endpoint.
+
+The RPC endpoint should be entirely server-controlled.
+
+⸻
+
+ERC-6492 Caveat
+
+The spec says:
+
+viem verifySiweMessage does all three
+
+I would verify this against the exact installed version.
+
+Reason:
+
+ERC-6492 support has evolved across library releases.
+
+Before implementation:
+
+npm ls viem
+
+and verify in documentation for that exact version.
+
+I would not trust assumptions here.
+
+This is the one place where a minor version difference can break Coinbase Smart Wallet support.
+
+⸻
+
+Add Smart Wallet Test Cases
+
+Current:
+
+Coinbase Smart Wallet
+MetaMask
+
+Good.
+
+I would add:
+
+Smart Wallet Not Yet Deployed
+
+Test:
+
+1. Fresh wallet
+2. No transactions
+3. Sign
+4. Verify succeeds
+
+This specifically exercises ERC-6492.
+
+Without this test you may accidentally only test ERC-1271.
+
+⸻
+
+2. Nonce Lifecycle Review (Second Highest Risk Area)
+
+This section is mostly excellent.
+
+Current:
+
+SETEX siwe:nonce:{userId}
+
+then
+
+GETDEL siwe:nonce:{userId}
+
+This is the correct pattern.
+
+⸻
+
+Why GETDEL Is Good
+
+Many implementations do:
+
+GET
+compare
+DEL
+
+which creates a race window.
+
+GETDEL eliminates that.
+
+Good choice.
+
+⸻
+
+Remaining Concern: Multiple Browser Tabs
+
+Example:
+
+Tab A:
+
+GET nonce
+
+Tab B:
+
+GET nonce
+
+Current key:
+
+siwe:nonce:{userId}
+
+Second request overwrites first.
+
+Result:
+
+Tab A signature becomes invalid.
+
+Not a security issue.
+
+But UX issue.
+
+⸻
+
+Better Design
+
+Store nonce by nonce ID.
+
+Example:
+
+siwe:nonce:{nonce}
+
+Value:
+
+{
+userId,
+createdAt
+}
+
+Then:
+```ts
+GETDEL(siwe:nonce:{nonce})
+
+Advantages:
+
+* multiple tabs work
+* replay still impossible
+* cleaner audit trail
+
+I recommend this approach.
+
+⸻
+
+Bind More Than User ID
+
+Current:
+
+nonce -> userId
+
+I would bind:
+
+{
+  "userId": "...",
+  "chainId": 8453
+}
+
+or:
+
+{
+  "userId": "...",
+  "sessionId": "..."
+}
+
+Then validate all fields.
+
+This further reduces replay surface.
+
+⸻
+
+Replay Protection Score
+
+Current design:
+
+9/10
+
+With nonce-keyed storage:
+
+10/10
+
+⸻
+
+3. SIWE Message Validation
+
+Current:
+
+expirationTime passed
+issuedAt implausibly old
+
+Needs precision.
+
+I would explicitly define:
+
+const MAX_MESSAGE_AGE_MS = 10 * 60 * 1000
+
+and reject:
+
+Date.now() - issuedAt > MAX_MESSAGE_AGE_MS
+
+Do not leave “implausibly old” subjective.
+
+Security reviews dislike vague language.
+
+⸻
+
+4. Domain Validation
+
+Current:
+
+domain === config.siweDomain
+
+Excellent.
+
+Keep strict equality.
+
+Avoid:
+
+endsWith()
+includes()
+contains()
+
+Strict equality only.
+
+⸻
+
+5. Missing URI Validation
+
+SIWE includes:
+
+domain
+uri
+
+Spec validates domain.
+
+I would also validate:
+
+uri === config.siweUri
+
+This is a small but worthwhile hardening step.
+
+⸻
+
+6. Address Canonicalization
+
+Before minting:
+
+const verifiedAddress = getAddress(parsed.address)
+
+Normalize checksum format.
+
+Prevents subtle comparison issues later.
+
+⸻
+
+7. Fail-Closed Verification Order
+
+Current order:
+
+1 Parse
+2 Domain
+3 Nonce
+4 Expiry
+5 Verify signature
+
+I would actually keep this.
+
+Some people suggest signature first.
+
+I disagree.
+
+Rejecting before expensive RPC verification is cheaper and safer.
+
+Current ordering is good.
+
+⸻
+
+8. Coinbase Review Perspective
+
+If I were reviewing this for Coinbase Full Access:
+
+The biggest thing I’d want evidence of is:
+
+Evidence #1
+
+Address used in token minting comes from:
+
+parsed.address
+
+after successful verification.
+
+NOT from request body.
+
+⸻
+
+Evidence #2
+
+ERC-1271 Smart Wallet verified successfully.
+
+Provide screenshots/logs.
+
+⸻
+
+Evidence #3
+
+Replay attempt rejected.
+
+Show:
+
+nonce used
+second request
+401/403
+
+That is the evidence reviewers usually care about.
+
+⸻
+
+Final Recommendation
+
+I would approve this design with the following required changes before implementation:
+
+1. Add explicit allowed-chain validation.
+2. Validate SIWE URI in addition to domain.
+3. Replace siwe:nonce:{userId} with siwe:nonce:{nonce} containing {userId} metadata.
+4. Define a strict maximum SIWE message age (10 minutes recommended).
+5. Verify exact viem version supports ERC-1271 and ERC-6492 as expected.
+6. Add a test using a never-deployed Coinbase Smart Wallet to exercise true ERC-6492 behavior.
+7. Normalize the recovered address before minting.
+
+If those seven items are added, I would consider the design strong enough for production and likely sufficient for Coinbase Full Access review.
